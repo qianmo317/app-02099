@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { mockQuestions } from '@/mock/questions'
 import { formatDate } from '@/utils/date'
 import logger from '@/utils/logger'
+import { useMistakeStore } from '@/stores/mistakes'
 
 export const useInterviewStore = defineStore('interview', () => {
   const currentSession = ref(null)
@@ -110,6 +111,15 @@ export const useInterviewStore = defineStore('interview', () => {
     localStorage.setItem('interviewResults', JSON.stringify(saved))
     allResults.value.unshift(result)
     currentSession.value = null
+
+    try {
+      const mistakeStore = useMistakeStore()
+      const unanswered = result.answers.filter((a) => !a.userAnswer || a.userAnswer.trim().length === 0)
+      mistakeStore.addMistakes(unanswered)
+    } catch (err) {
+      logger.error('Failed to auto-add mistakes:', err)
+    }
+
     logger.info('Interview finished, result id:', id)
     return id
   }

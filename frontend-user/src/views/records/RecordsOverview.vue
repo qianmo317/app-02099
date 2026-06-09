@@ -2,10 +2,12 @@
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRecordStore } from '@/stores/records'
-import { Collection, ChatLineSquare, Star } from '@element-plus/icons-vue'
+import { useMistakeStore } from '@/stores/mistakes'
+import { Collection, ChatLineSquare, Star, Warning } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const recordStore = useRecordStore()
+const mistakeStore = useMistakeStore()
 
 onMounted(() => {
   recordStore.fetchOverview()
@@ -51,7 +53,7 @@ const maxRadar = computed(() => Math.max(...radarData.value, 1))
   <div class="space-y-6">
     <h1 class="font-display text-2xl font-bold text-navy-900 dark:text-white">学习记录</h1>
 
-    <div class="grid sm:grid-cols-3 gap-4">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <div class="stat-card cursor-pointer" @click="router.push('/records/questions')">
         <div class="flex items-center gap-3 mb-2">
           <div class="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-950/20 flex items-center justify-center">
@@ -82,6 +84,20 @@ const maxRadar = computed(() => Math.max(...radarData.value, 1))
           <div>
             <div class="text-2xl font-display font-bold text-navy-900 dark:text-white">{{ overview.favoriteCount }}</div>
             <div class="text-xs text-navy-400">收藏题目</div>
+          </div>
+        </div>
+      </div>
+      <div class="stat-card cursor-pointer" @click="router.push('/records/mistakes')">
+        <div class="flex items-center gap-3 mb-2">
+          <div class="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/20 flex items-center justify-center">
+            <el-icon :size="20" class="text-red-500"><Warning /></el-icon>
+          </div>
+          <div>
+            <div class="text-2xl font-display font-bold text-navy-900 dark:text-white">
+              {{ mistakeStore.unmasteredCount }}
+              <span v-if="mistakeStore.masteredCount > 0" class="text-sm font-normal text-navy-400">/ {{ mistakeStore.totalCount }}</span>
+            </div>
+            <div class="text-xs text-navy-400">错题本</div>
           </div>
         </div>
       </div>

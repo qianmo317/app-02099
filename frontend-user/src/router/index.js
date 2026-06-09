@@ -62,6 +62,12 @@ const routes = [
     meta: { title: '收藏夹', breadcrumb: '收藏夹', parent: 'Records' }
   },
   {
+    path: '/records/mistakes',
+    name: 'Mistakes',
+    component: () => import('@/views/records/Mistakes.vue'),
+    meta: { title: '错题本', breadcrumb: '错题本', parent: 'Records' }
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/views/NotFound.vue'),
