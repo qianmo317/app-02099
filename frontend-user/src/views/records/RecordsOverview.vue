@@ -2,10 +2,12 @@
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRecordStore } from '@/stores/records'
-import { Collection, ChatLineSquare, Star } from '@element-plus/icons-vue'
+import { useWrongQuestionStore } from '@/stores/wrongQuestion'
+import { Collection, ChatLineSquare, Star, CircleClose } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const recordStore = useRecordStore()
+const wrongStore = useWrongQuestionStore()
 
 onMounted(() => {
   recordStore.fetchOverview()
@@ -51,7 +53,7 @@ const maxRadar = computed(() => Math.max(...radarData.value, 1))
   <div class="space-y-6">
     <h1 class="font-display text-2xl font-bold text-navy-900 dark:text-white">学习记录</h1>
 
-    <div class="grid sm:grid-cols-3 gap-4">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <div class="stat-card cursor-pointer" @click="router.push('/records/questions')">
         <div class="flex items-center gap-3 mb-2">
           <div class="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-950/20 flex items-center justify-center">
@@ -82,6 +84,17 @@ const maxRadar = computed(() => Math.max(...radarData.value, 1))
           <div>
             <div class="text-2xl font-display font-bold text-navy-900 dark:text-white">{{ overview.favoriteCount }}</div>
             <div class="text-xs text-navy-400">收藏题目</div>
+          </div>
+        </div>
+      </div>
+      <div class="stat-card cursor-pointer" @click="router.push('/records/wrong')">
+        <div class="flex items-center gap-3 mb-2">
+          <div class="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-950/20 flex items-center justify-center">
+            <el-icon :size="20" class="text-orange-500"><CircleClose /></el-icon>
+          </div>
+          <div>
+            <div class="text-2xl font-display font-bold text-navy-900 dark:text-white">{{ wrongStore.unmasteredCount }}</div>
+            <div class="text-xs text-navy-400">错题未掌握</div>
           </div>
         </div>
       </div>

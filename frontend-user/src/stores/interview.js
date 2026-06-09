@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { mockQuestions } from '@/mock/questions'
 import { formatDate } from '@/utils/date'
 import logger from '@/utils/logger'
+import { useWrongQuestionStore } from '@/stores/wrongQuestion'
 
 export const useInterviewStore = defineStore('interview', () => {
   const currentSession = ref(null)
@@ -110,6 +111,10 @@ export const useInterviewStore = defineStore('interview', () => {
     localStorage.setItem('interviewResults', JSON.stringify(saved))
     allResults.value.unshift(result)
     currentSession.value = null
+
+    const wrongStore = useWrongQuestionStore()
+    wrongStore.addFromInterview(id, result.answers)
+
     logger.info('Interview finished, result id:', id)
     return id
   }
