@@ -2,11 +2,14 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useInterviewStore } from '@/stores/interview'
+import { useWrongQuestionStore } from '@/stores/wrongQuestion'
 import { formatDate } from '@/utils/date'
+import { ElMessage } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
 const store = useInterviewStore()
+const wrongStore = useWrongQuestionStore()
 
 const result = ref(null)
 const expandedIds = ref(new Set())
@@ -54,6 +57,21 @@ const scoreColor = computed(() => {
   if (score.value >= 50) return 'text-amber-500'
   return 'text-rose-400'
 })
+
+function addToWrongBook(a) {
+  const added = wrongStore.addSingle({
+    title: a.title,
+    category: a.category,
+    userAnswer: a.userAnswer,
+    referenceAnswer: a.referenceAnswer,
+    sourceInterviewId: result.value?.id
+  })
+  if (added) {
+    ElMessage.success('已加入错题本')
+  } else {
+    ElMessage.info('该题已在错题本中')
+  }
+}
 </script>
 
 <template>
@@ -94,9 +112,19 @@ const scoreColor = computed(() => {
               >{{ idx + 1 }}</div>
               <span class="text-sm font-medium text-navy-900 dark:text-white">{{ a.title }}</span>
             </div>
-            <el-icon class="transition-transform" :class="expandedIds.has(idx) ? 'rotate-180' : ''">
-              <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"/></svg>
-            </el-icon>
+            <div class="flex items-center gap-2">
+              <el-button
+                v-if="!wrongStore.isInWrongBook(a.title)"
+                size="small"
+                type="warning"
+                text
+                @click.stop="addToWrongBook(a)"
+              >加入错题本</el-button>
+              <el-tag v-else size="small" type="info" effect="plain" round>已收录</el-tag>
+              <el-icon class="transition-transform" :class="expandedIds.has(idx) ? 'rotate-180' : ''">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"/></svg>
+              </el-icon>
+            </div>
           </div>
           <el-collapse-transition>
             <div v-show="expandedIds.has(idx)" class="px-4 pb-4 space-y-3 border-t border-slate-100 dark:border-navy-700 pt-3">
