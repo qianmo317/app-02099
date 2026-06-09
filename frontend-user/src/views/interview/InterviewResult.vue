@@ -2,14 +2,19 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useInterviewStore } from '@/stores/interview'
+import { useMistakeStore } from '@/stores/mistakes'
 import { formatDate } from '@/utils/date'
+import { ElMessage } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
 const store = useInterviewStore()
+const mistakeStore = useMistakeStore()
 
 const result = ref(null)
 const expandedIds = ref(new Set())
+const manualSelected = ref(new Set())
+const mistakesAdded = ref(false)
 
 onMounted(() => {
   const id = Number(route.params.id)
@@ -24,6 +29,46 @@ function toggleExpand(idx) {
     expandedIds.value.delete(idx)
   } else {
     expandedIds.value.add(idx)
+  }
+}
+
+function isUnanswered(a) {
+  return !a.userAnswer || a.userAnswer.trim().length === 0
+}
+
+function toggleManual(idx) {
+  if (manualSelected.value.has(idx)) {
+    manualSelected.value.delete(idx)
+  } else {
+    manualSelected.value.add(idx)
+  }
+}
+
+function toggleSelectAllAnswered() {
+  const answeredIndices = result.value.answers
+    .map((a, i) => ({ a, i }))
+    .filter(({ a }) => !isUnanswered(a))
+    .map(({ i }) => i)
+  const allSelected = answeredIndices.every((i) => manualSelected.value.has(i))
+  if (allSelected) {
+    answeredIndices.forEach((i) => manualSelected.value.delete(i))
+  } else {
+    answeredIndices.forEach((i) => manualSelected.value.add(i))
+  }
+}
+
+function addToMistakes() {
+  const items = result.value.answers.filter((_, idx) => manualSelected.value.has(idx))
+  if (items.length === 0) {
+    ElMessage.warning('请先勾选答错的题目')
+    return
+  }
+  const added = mistakeStore.addMistakes(items)
+  mistakesAdded.value = true
+  if (added > 0) {
+    ElMessage.success(`已将 ${added} 道错题加入错题本`)
+  } else {
+    ElMessage.info('选中的题目已在错题本中')
   }
 }
 
@@ -54,6 +99,18 @@ const scoreColor = computed(() => {
   if (score.value >= 50) return 'text-amber-500'
   return 'text-rose-400'
 })
+
+const unansweredCount = computed(() =>
+  result.value ? result.value.answers.filter(isUnanswered).length : 0
+)
+
+const allAnsweredSelected = computed(() => {
+  if (!result.value) return false
+  const answeredIndices = result.value.answers
+    .map((a, i) => i)
+    .filter((i) => !isUnanswered(result.value.answers[i]))
+  return answeredIndices.length > 0 && answeredIndices.every((i) => manualSelected.value.has(i))
+})
 </script>
 
 <template>
@@ -75,28 +132,66 @@ const scoreColor = computed(() => {
       </div>
     </div>
 
+    <div v-if="unansweredCount > 0" class="bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/50 rounded-xl p-4 flex items-center gap-3">
+      <el-icon :size="20" class="text-rose-500 flex-shrink-0">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
+      </el-icon>
+      <div class="text-sm text-rose-700 dark:text-rose-300">
+        {{ unansweredCount }} 道题未作答，已自动收录到错题本
+      </div>
+    </div>
+
     <div class="bg-white dark:bg-navy-900 rounded-2xl p-6 border border-slate-100 dark:border-navy-700">
-      <h2 class="font-display font-semibold text-navy-900 dark:text-white mb-4">题目回顾</h2>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-display font-semibold text-navy-900 dark:text-white">题目回顾</h2>
+        <div class="flex items-center gap-3">
+          <el-checkbox :model-value="allAnsweredSelected" @change="toggleSelectAllAnswered">全选已答</el-checkbox>
+          <span class="text-sm text-navy-400">勾选答错 {{ manualSelected.size }} 题</span>
+          <el-button
+            type="danger"
+            size="small"
+            :disabled="mistakesAdded || manualSelected.size === 0"
+            @click="addToMistakes"
+          >
+            {{ mistakesAdded ? '已加入错题本' : '加入错题本' }}
+          </el-button>
+        </div>
+      </div>
       <div class="space-y-3">
         <div
           v-for="(a, idx) in result.answers"
           :key="idx"
-          class="border border-slate-100 dark:border-navy-700 rounded-xl overflow-hidden"
+          class="border rounded-xl overflow-hidden transition-colors"
+          :class="isUnanswered(a)
+            ? 'border-rose-200 dark:border-rose-900/50 bg-rose-50/30 dark:bg-rose-950/5'
+            : manualSelected.has(idx)
+              ? 'border-amber-200 dark:border-amber-900/50 bg-amber-50/30 dark:bg-amber-950/5'
+              : 'border-slate-100 dark:border-navy-700'"
         >
           <div
             class="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-navy-800 transition-colors"
-            @click="toggleExpand(idx)"
           >
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 flex-1 min-w-0" @click="toggleExpand(idx)">
               <div
-                class="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white"
-                :class="a.userAnswer.trim() ? 'bg-brand-400' : 'bg-slate-300 dark:bg-navy-600'"
+                class="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white flex-shrink-0"
+                :class="isUnanswered(a) ? 'bg-rose-400' : 'bg-brand-400'"
               >{{ idx + 1 }}</div>
-              <span class="text-sm font-medium text-navy-900 dark:text-white">{{ a.title }}</span>
+              <span class="text-sm font-medium text-navy-900 dark:text-white truncate">{{ a.title }}</span>
+              <el-tag v-if="isUnanswered(a)" size="small" type="danger" effect="plain" round>未作答·已收录</el-tag>
             </div>
-            <el-icon class="transition-transform" :class="expandedIds.has(idx) ? 'rotate-180' : ''">
-              <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"/></svg>
-            </el-icon>
+            <div class="flex items-center gap-2 flex-shrink-0 ml-2">
+              <el-checkbox
+                v-if="!isUnanswered(a)"
+                :model-value="manualSelected.has(idx)"
+                @change="toggleManual(idx)"
+                @click.stop
+                title="这道题答错了"
+              />
+              <el-tag v-else size="small" type="info" effect="plain">自动收录</el-tag>
+              <el-icon class="transition-transform" :class="expandedIds.has(idx) ? 'rotate-180' : ''" @click="toggleExpand(idx)">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"/></svg>
+              </el-icon>
+            </div>
           </div>
           <el-collapse-transition>
             <div v-show="expandedIds.has(idx)" class="px-4 pb-4 space-y-3 border-t border-slate-100 dark:border-navy-700 pt-3">
@@ -116,6 +211,7 @@ const scoreColor = computed(() => {
 
     <div class="flex items-center justify-center gap-4 pt-4">
       <el-button @click="router.push('/records/interviews')">查看历史记录</el-button>
+      <el-button @click="router.push('/records/mistakes')">查看错题本</el-button>
       <el-button type="primary" @click="router.push('/interview')">再来一次</el-button>
     </div>
   </div>
