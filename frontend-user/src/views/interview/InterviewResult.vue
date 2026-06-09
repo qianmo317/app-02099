@@ -2,11 +2,14 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useInterviewStore } from '@/stores/interview'
+import { useWrongQuestionStore } from '@/stores/wrongQuestions'
 import { formatDate } from '@/utils/date'
+import { ElMessage } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
 const store = useInterviewStore()
+const wrongStore = useWrongQuestionStore()
 
 const result = ref(null)
 const expandedIds = ref(new Set())
@@ -24,6 +27,16 @@ function toggleExpand(idx) {
     expandedIds.value.delete(idx)
   } else {
     expandedIds.value.add(idx)
+  }
+}
+
+function toggleWrong(answer) {
+  if (wrongStore.isWrong(answer.title)) {
+    wrongStore.removeWrongQuestion(answer.title)
+    ElMessage.success('已移出错题本')
+  } else {
+    wrongStore.addWrongQuestion(answer)
+    ElMessage.success('已加入错题本')
   }
 }
 
@@ -87,16 +100,26 @@ const scoreColor = computed(() => {
             class="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-navy-800 transition-colors"
             @click="toggleExpand(idx)"
           >
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 flex-1 min-w-0">
               <div
-                class="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white"
+                class="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white flex-shrink-0"
                 :class="a.userAnswer.trim() ? 'bg-brand-400' : 'bg-slate-300 dark:bg-navy-600'"
               >{{ idx + 1 }}</div>
-              <span class="text-sm font-medium text-navy-900 dark:text-white">{{ a.title }}</span>
+              <span class="text-sm font-medium text-navy-900 dark:text-white truncate">{{ a.title }}</span>
             </div>
-            <el-icon class="transition-transform" :class="expandedIds.has(idx) ? 'rotate-180' : ''">
-              <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"/></svg>
-            </el-icon>
+            <div class="flex items-center gap-2 ml-2">
+              <el-button
+                size="small"
+                :type="wrongStore.isWrong(a.title) ? 'warning' : 'default'"
+                text
+                @click.stop="toggleWrong(a)"
+              >
+                {{ wrongStore.isWrong(a.title) ? '移出错题本' : '加入错题本' }}
+              </el-button>
+              <el-icon class="transition-transform text-navy-400" :class="expandedIds.has(idx) ? 'rotate-180' : ''">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"/></svg>
+              </el-icon>
+            </div>
           </div>
           <el-collapse-transition>
             <div v-show="expandedIds.has(idx)" class="px-4 pb-4 space-y-3 border-t border-slate-100 dark:border-navy-700 pt-3">
