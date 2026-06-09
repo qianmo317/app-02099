@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { mockQuestions } from '@/mock/questions'
 import { formatDate } from '@/utils/date'
 import logger from '@/utils/logger'
+import { useWrongQuestionStore } from './wrongQuestions'
 
 export const useInterviewStore = defineStore('interview', () => {
   const currentSession = ref(null)
@@ -92,17 +93,20 @@ export const useInterviewStore = defineStore('interview', () => {
     if (!currentSession.value) return null
     const session = currentSession.value
     const id = Date.now()
+    const answers = session.questions.map((q, i) => ({
+      title: q.title,
+      category: q.category,
+      difficulty: q.difficulty,
+      description: q.description,
+      userAnswer: session.answers[i] || '',
+      referenceAnswer: q.answer
+    }))
     const result = {
       id,
       type: session.type,
       difficulty: session.difficulty,
       createdAt: new Date().toISOString(),
-      answers: session.questions.map((q, i) => ({
-        title: q.title,
-        category: q.category,
-        userAnswer: session.answers[i] || '',
-        referenceAnswer: q.answer
-      }))
+      answers
     }
 
     const saved = JSON.parse(localStorage.getItem('interviewResults') || '[]')
@@ -110,6 +114,14 @@ export const useInterviewStore = defineStore('interview', () => {
     localStorage.setItem('interviewResults', JSON.stringify(saved))
     allResults.value.unshift(result)
     currentSession.value = null
+
+    const wrongStore = useWrongQuestionStore()
+    const wrongAnswers = answers.filter((a) => !a.userAnswer.trim())
+    if (wrongAnswers.length > 0) {
+      wrongStore.addWrongQuestions(wrongAnswers)
+      logger.info('Added', wrongAnswers.length, 'wrong questions to wrong book')
+    }
+
     logger.info('Interview finished, result id:', id)
     return id
   }
