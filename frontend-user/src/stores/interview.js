@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { mockQuestions } from '@/mock/questions'
 import { formatDate } from '@/utils/date'
 import logger from '@/utils/logger'
+import { useWrongQuestionStore } from '@/stores/wrongQuestions'
 
 export const useInterviewStore = defineStore('interview', () => {
   const currentSession = ref(null)
@@ -109,6 +110,19 @@ export const useInterviewStore = defineStore('interview', () => {
     saved.unshift(result)
     localStorage.setItem('interviewResults', JSON.stringify(saved))
     allResults.value.unshift(result)
+
+    // 自动收集答错或未作答的题目到错题本
+    try {
+      const wrongStore = useWrongQuestionStore()
+      const added = wrongStore.collectFromInterview(result.answers, {
+        sessionId: result.id,
+        type: result.type
+      })
+      if (added > 0) logger.info(`Added ${added} wrong questions from session ${result.id}`)
+    } catch (err) {
+      logger.error('Failed to collect wrong questions:', err)
+    }
+
     currentSession.value = null
     logger.info('Interview finished, result id:', id)
     return id
@@ -119,6 +133,53 @@ export const useInterviewStore = defineStore('interview', () => {
     return allResults.value.find((r) => r.id === id) || null
   }
 
+  /**
+   * 显式标记某道题的对错。会同步更新到 localStorage，并按需联动错题本。
+   * @param {number} resultId
+   * @param {number} answerIndex
+   * @param {boolean} correct true=答对（从错题本移除），false=答错（加入错题本）
+   */
+  function markAnswerCorrect(resultId, answerIndex, correct) {
+    const result = allResults.value.find((r) => r.id === resultId)
+    if (!result || !result.answers[answerIndex]) return
+    const answer = result.answers[answerIndex]
+    answer.correct = correct
+
+    // 持久化整份记录列表（仅持久化用户产生的，不动预置的）
+    const saved = JSON.parse(localStorage.getItem('interviewResults') || '[]')
+    const idx = saved.findIndex((r) => r.id === resultId)
+    if (idx >= 0) {
+      saved[idx] = result
+      localStorage.setItem('interviewResults', JSON.stringify(saved))
+    }
+
+    // 联动错题本
+    try {
+      const wrongStore = useWrongQuestionStore()
+      if (correct === false) {
+        wrongStore.addManual({
+          title: answer.title,
+          category: answer.category,
+          userAnswer: answer.userAnswer,
+          referenceAnswer: answer.referenceAnswer,
+          sessionId: result.id,
+          sessionType: result.type
+        })
+      } else if (correct === true) {
+        // 标记为答对：若用户已作答，则从错题本移除（未作答的仍保留为「未作答」错题）
+        const userText = (answer.userAnswer || '').trim()
+        if (userText.length > 0) {
+          const found = wrongStore.items.find(
+            (i) => i.title === answer.title && (i.category || '未分类') === (answer.category || '未分类')
+          )
+          if (found) wrongStore.remove(found.id)
+        }
+      }
+    } catch (err) {
+      logger.error('Failed to sync wrong questions on mark:', err)
+    }
+  }
+
   function clearSession() {
     currentSession.value = null
   }
@@ -126,6 +187,6 @@ export const useInterviewStore = defineStore('interview', () => {
   return {
     currentSession, allResults,
     loadResults, createSession, submitAnswer, nextQuestion,
-    finishSession, getResultById, clearSession
+    finishSession, getResultById, markAnswerCorrect, clearSession
   }
 })
